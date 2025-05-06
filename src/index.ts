@@ -2,13 +2,14 @@ import { Hono } from "hono";
 import { DurableMCP } from "workers-mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import OAuthProvider, { type OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+import { z } from "zod";
 
 import type { UserProps } from "./types";
 import { authorize, callback, confirmConsent, tokenExchangeCallback } from "./auth";
 
 export class AuthenticatedMCP extends DurableMCP<UserProps, Env> {
 	server = new McpServer({
-		name: "Auth0 OIDC Proxy Demo",
+		name: "Book Me",
 		version: "1.0.0",
 	});
 
@@ -17,52 +18,13 @@ export class AuthenticatedMCP extends DurableMCP<UserProps, Env> {
 		this.server.tool("whoami", "Get the current user's details", {}, async () => ({
 			content: [{ type: "text", text: JSON.stringify(this.props.claims, null, 2) }],
 		}));
-
-		// Call the Todos API on behalf of the current user.
-		this.server.tool("list-todos", "List the current user's todos", {}, async () => {
-			try {
-				const response = await fetch(`${this.env.API_BASE_URL}/api/todos`, {
-					headers: {
-						// The Auth0 Access Token is available in props.tokenSet and can be used to call the Upstream API (Todos API).
-						Authorization: `Bearer ${this.props.tokenSet.accessToken}`,
-					},
-				});
-
-				const data = await response.json();
-				return {
-					content: [
-						{
-							type: "text",
-							text: JSON.stringify(data),
-						},
-					],
-				};
-			} catch (e) {
-				return {
-					content: [{ type: "text", text: `The call to the Todos API failed: ${e}` }],
-				};
-			}
-		});
-
-		// Get the current user's billing settings.
-		// Note that read:billing is not being requested by the MCP server, meaning that this request will fail.
-		// This is to show it's possible to implement scenarios where the MCP server can only call the APIs which the user has consented to.
 		this.server.tool(
-			"list-billing",
-			"List the current user's billing settings",
-			{},
-			async () => {
-				const response = await fetch(`${this.env.API_BASE_URL}/api/billing`, {
-					headers: {
-						Authorization: `Bearer ${this.props.tokenSet.accessToken}`,
-					},
-				});
-
-				return {
-					content: [{ type: "text", text: await response.text() }],
-				};
-			},
-		);
+			"add",
+			{ a: z.number(), b: z.number() },
+			async ({ a, b }) => ({
+			  content: [{ type: "text", text: String(a + b) }],
+			}),
+		  );
 	}
 }
 
